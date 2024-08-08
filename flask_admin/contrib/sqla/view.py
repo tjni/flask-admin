@@ -370,7 +370,7 @@ class ModelView(BaseModelView):
         if model is None:
             model = self.model
 
-        return model._sa_class_manager.mapper.iterate_properties
+        return model._sa_class_manager.mapper.attrs
 
     def _apply_path_joins(self, query, joins, path, inner_join=True):
         """
@@ -1126,8 +1126,8 @@ class ModelView(BaseModelView):
     def handle_view_exception(self, exc):
         if isinstance(exc, IntegrityError):
             if current_app.config.get(
-                'ADMIN_RAISE_ON_INTEGRITY_ERROR',
-                current_app.config.get('ADMIN_RAISE_ON_VIEW_EXCEPTION')
+                'FLASK_ADMIN_RAISE_ON_INTEGRITY_ERROR',
+                current_app.config.get('FLASK_ADMIN_RAISE_ON_VIEW_EXCEPTION')
             ):
                 raise
             else:

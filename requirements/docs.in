@@ -1,4 +1,4 @@
--c tests.in
+-r tests.in
 
 pallets-sphinx-themes
 sphinx

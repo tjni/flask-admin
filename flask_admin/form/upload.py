@@ -4,6 +4,8 @@ from types import ModuleType
 from typing import Optional
 from urllib.parse import urljoin
 
+from markupsafe import Markup
+
 from werkzeug.utils import secure_filename
 from werkzeug.datastructures import FileStorage
 
@@ -14,7 +16,6 @@ from wtforms.widgets import html_params
 from flask_admin.babel import gettext
 from flask_admin.helpers import get_url
 
-from flask_admin._backwards import Markup
 from flask_admin._compat import string_types
 
 Image: Optional[ModuleType]
@@ -387,7 +388,10 @@ class ImageUploadField(FileUploadField):
         """
         # Check if PIL is installed
         if Image is None:
-            raise ImportError('PIL library was not found')
+            raise Exception(
+                'Could not import `PIL`. '
+                'Enable `images` integration by installing `flask-admin[images]`'
+            )
 
         self.max_size = max_size
         self.thumbnail_fn = thumbgen or thumbgen_filename

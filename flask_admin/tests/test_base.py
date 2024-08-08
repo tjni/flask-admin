@@ -10,7 +10,7 @@ from flask_admin import base
 
 @pytest.fixture
 def app():
-    # Overrides the `app` fixture in `flask_admin/tests/conftest.py` so that the `sqla`
+    # Overrides the `app` fixture in `flask_admin/tests/conftest.py` so that the `tests`
     # directory/import path is configured as the root path for Flask. This will
     # cause the `templates` directory here to be used for template resolution.
     app = Flask(__name__)
@@ -164,7 +164,7 @@ def test_admin_customizations(app, babel):
 
     # test custom static_url_path
     with app.test_request_context('/'):
-        rv = client.get(url_for('admin.static', filename='bootstrap/bootstrap2/css/bootstrap.css'))
+        rv = client.get(url_for('admin.static', filename='bootstrap/bootstrap4/css/bootstrap.min.css'))
     assert rv.status_code == 200
 
 
@@ -186,7 +186,7 @@ def test_baseview_registration():
     # Verify generated blueprint properties
     assert bp.name == view.endpoint
     assert bp.url_prefix == view.url
-    assert bp.template_folder == os.path.join('templates', 'bootstrap2')
+    assert bp.template_folder == os.path.join('templates', 'bootstrap4')
     assert bp.static_folder == view.static_folder
 
     # Verify customizations
@@ -400,7 +400,7 @@ def test_root_mount(app, babel):
 
     # test static files when url='/'
     with app.test_request_context('/'):
-        rv = client.get(url_for('admin.static', filename='bootstrap/bootstrap2/css/bootstrap.css'))
+        rv = client.get(url_for('admin.static', filename='bootstrap/bootstrap4/css/bootstrap.min.css'))
         rv.close()
     assert rv.status_code == 200
 

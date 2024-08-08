@@ -42,7 +42,7 @@ def create_models(db):
         def __init__(self, test1=None, test2=None, test3=None, test4=None,
                      bool_field=False, date_field=None, time_field=None,
                      datetime_field=None, email_field=None,
-                     choice_field=None, enum_field=None):
+                     choice_field=None, enum_field=None, enum_type_field=None):
             self.test1 = test1
             self.test2 = test2
             self.test3 = test3
@@ -54,6 +54,7 @@ def create_models(db):
             self.email_field = email_field
             self.choice_field = choice_field
             self.enum_field = enum_field
+            self.enum_type_field = enum_type_field
 
         class EnumChoices(enum.Enum):
             first = 1
@@ -70,6 +71,7 @@ def create_models(db):
         datetime_field = db.Column(db.DateTime)
         email_field = db.Column(EmailType)
         enum_field = db.Column(db.Enum('model1_v1', 'model1_v2'), nullable=True)
+        enum_type_field = db.Column(db.Enum(EnumChoices), nullable=True)
         choice_field = db.Column(db.String, nullable=True)
         sqla_utils_choice = db.Column(ChoiceType([
             ('choice-1', u'First choice'),
@@ -143,6 +145,9 @@ def fill_db(db, Model1, Model2):
     enum_obj1 = Model1('enum_obj1', enum_field="model1_v1")
     enum_obj2 = Model1('enum_obj2', enum_field="model1_v2")
 
+    enum_type_obj1 = Model1('enum_type_obj1', enum_type_field=Model1.EnumChoices.first)
+    enum_type_obj2 = Model1('enum_type_obj2', enum_type_field=Model1.EnumChoices.second)
+
     empty_obj = Model1(test2="empty_obj")
 
     db.session.add_all([
@@ -150,12 +155,14 @@ def fill_db(db, Model1, Model2):
         model2_obj1, model2_obj2, model2_obj3, model2_obj4, model2_obj5,
         date_obj1, timeonly_obj1, datetime_obj1,
         date_obj2, timeonly_obj2, datetime_obj2,
-        enum_obj1, enum_obj2, empty_obj
+        enum_obj1, enum_obj2, enum_type_obj1, enum_type_obj2, empty_obj
     ])
     db.session.commit()
 
 
-@pytest.mark.filterwarnings("ignore:Please update your type formatter:UserWarning")
+@pytest.mark.filterwarnings(
+    "ignore:'iter_groups' is expected to return 4 items tuple since wtforms 3.1, this will be mandatory in wtforms 3.2:DeprecationWarning",
+)
 def test_model(app, db, admin):
     with app.app_context():
         Model1, Model2 = create_models(db)
@@ -235,8 +242,8 @@ def test_model(app, db, admin):
         model = db.session.query(Model1).first()
         assert model.test1 == u'test1large'
         assert model.test2 == u'test2'
-        assert model.test3 == u''
-        assert model.test4 == u''
+        assert model.test3 == None
+        assert model.test4 == None
         assert model.email_field == u'test@test.com'
         assert model.choice_field == u'choice-1'
         assert model.enum_field == u'model1_v1'
@@ -285,8 +292,8 @@ def test_model(app, db, admin):
         model = db.session.query(Model1).first()
         assert model.test1 == 'test1small'
         assert model.test2 == 'test2large'
-        assert model.test3 == ''
-        assert model.test4 == ''
+        assert model.test3 == None
+        assert model.test4 == None
         assert model.email_field == u'test2@test.com'
         assert model.choice_field is None
         assert model.enum_field is None
@@ -379,8 +386,8 @@ def test_exclude_columns(app, db, admin):
 
         view = CustomModelView(
             Model1, db.session,
-            column_exclude_list=['test2', 'test4', 'enum_field', 'date_field', 'time_field', 'datetime_field',
-                                 'sqla_utils_choice', 'sqla_utils_enum', 'sqla_utils_arrow', 'sqla_utils_uuid',
+            column_exclude_list=['test2', 'test4', 'enum_field', 'enum_type_field', 'date_field', 'datetime_field',
+                                 'time_field', 'sqla_utils_choice', 'sqla_utils_enum', 'sqla_utils_arrow', 'sqla_utils_uuid',
                                  'sqla_utils_url', 'sqla_utils_ip_address', 'sqla_utils_currency', 'sqla_utils_color']
         )
         admin.add_view(view)
@@ -470,7 +477,6 @@ def test_extra_args_filter(app, db, admin):
         assert '<input type="hidden" name="foo" value="bar">' in data
 
 
-@pytest.mark.filterwarnings("ignore:Please update your type formatter:UserWarning")
 def test_complex_searchable_list(app, db, admin):
     with app.app_context():
         Model1, Model2 = create_models(db)
@@ -505,7 +511,6 @@ def test_complex_searchable_list(app, db, admin):
         assert 'model1-test2-val' not in data
 
 
-@pytest.mark.filterwarnings("ignore:Please update your type formatter:UserWarning")
 def test_complex_searchable_list_missing_children(app, db, admin):
     with app.app_context():
         Model1, Model2 = create_models(db)
@@ -525,7 +530,6 @@ def test_complex_searchable_list_missing_children(app, db, admin):
         assert 'magic string' in data
 
 
-@pytest.mark.filterwarnings("ignore:Please update your type formatter:UserWarning")
 def test_column_editable_list(app, db, admin):
     with app.app_context():
         Model1, Model2 = create_models(db)
@@ -533,6 +537,7 @@ def test_column_editable_list(app, db, admin):
         view = CustomModelView(Model1, db.session,
                                column_editable_list=['test1', 'enum_field'])
         admin.add_view(view)
+
         # Test in-line editing for relations
         view = CustomModelView(Model2, db.session, column_editable_list=['model1'])
         admin.add_view(view)
@@ -683,7 +688,6 @@ def test_editable_list_special_pks(app, db, admin):
         assert 'change-success-1' in data
 
 
-@pytest.mark.filterwarnings("ignore:Please update your type formatter:UserWarning")
 def test_column_filters(app, db, admin):
     with app.app_context():
         Model1, Model2 = create_models(db)
@@ -753,6 +757,11 @@ def test_column_filters(app, db, admin):
                                      filters.FilterEqual(Model1.test1, "Test1")
                                  ], endpoint='_relation_test')
         admin.add_view(view13)
+
+        view14 = CustomModelView(Model1, db.session,
+                                 column_filters=['enum_type_field'],
+                                 endpoint="_enumtypefield")
+        admin.add_view(view14)
 
         # Test views
         assert \
@@ -882,35 +891,45 @@ def test_column_filters(app, db, admin):
             ]
 
         assert \
+            [(f['index'], f['operation']) for f in view2._filter_groups[u'Model1 / Enum Type Field']] == \
+            [
+                (63, u'equals'),
+                (64, u'not equal'),
+                (65, u'empty'),
+                (66, u'in list'),
+                (67, u'not in list'),
+            ]
+
+        assert \
             [(f['index'], f['operation']) for f in view2._filter_groups[u'Model1 / Choice Field']] == \
             [
-                (63, u'contains'),
-                (64, u'not contains'),
-                (65, u'equals'),
-                (66, u'not equal'),
-                (67, u'empty'),
-                (68, u'in list'),
-                (69, u'not in list'),
+                (68, u'contains'),
+                (69, u'not contains'),
+                (70, u'equals'),
+                (71, u'not equal'),
+                (72, u'empty'),
+                (73, u'in list'),
+                (74, u'not in list'),
             ]
 
         assert \
             [(f['index'], f['operation']) for f in view2._filter_groups[u'Model1 / Sqla Utils Choice']] == \
-            [
-                (70, u'equals'),
-                (71, u'not equal'),
-                (72, u'contains'),
-                (73, u'not contains'),
-                (74, u'empty'),
-            ]
-
-        assert \
-            [(f['index'], f['operation']) for f in view2._filter_groups[u'Model1 / Sqla Utils Enum']] == \
             [
                 (75, u'equals'),
                 (76, u'not equal'),
                 (77, u'contains'),
                 (78, u'not contains'),
                 (79, u'empty'),
+            ]
+
+        assert \
+            [(f['index'], f['operation']) for f in view2._filter_groups[u'Model1 / Sqla Utils Enum']] == \
+            [
+                (80, u'equals'),
+                (81, u'not equal'),
+                (82, u'contains'),
+                (83, u'not contains'),
+                (84, u'empty'),
             ]
 
         # Test filter with a dot
@@ -1535,6 +1554,53 @@ def test_column_filters(app, db, admin):
         assert 'enum_obj1' not in data
         assert 'enum_obj2' not in data
 
+        # Test enum type filter
+        # enum type - equals
+        rv = client.get('/admin/_enumtypefield/?flt0_0=first')
+        assert rv.status_code == 200
+        data = rv.data.decode('utf-8')
+        assert 'enum_type_obj1' in data
+        assert 'enum_type_obj2' not in data
+
+        # enum - not equal
+        rv = client.get('/admin/_enumtypefield/?flt0_1=first')
+        assert rv.status_code == 200
+        data = rv.data.decode('utf-8')
+        assert 'enum_type_obj1' not in data
+        assert 'enum_type_obj2' in data
+
+        # enum - empty
+        rv = client.get('/admin/_enumtypefield/?flt0_2=1')
+        assert rv.status_code == 200
+        data = rv.data.decode('utf-8')
+        assert 'test1_val_1' in data
+        assert 'enum_type_obj1' not in data
+        assert 'enum_type_obj2' not in data
+
+        # enum - not empty
+        rv = client.get('/admin/_enumtypefield/?flt0_2=0')
+        assert rv.status_code == 200
+        data = rv.data.decode('utf-8')
+        assert 'test1_val_1' not in data
+        assert 'enum_type_obj1' in data
+        assert 'enum_type_obj2' in data
+
+        # enum - in list
+        rv = client.get('/admin/_enumtypefield/?flt0_3=first%2Csecond')
+        assert rv.status_code == 200
+        data = rv.data.decode('utf-8')
+        assert 'test1_val_1' not in data
+        assert 'enum_type_obj1' in data
+        assert 'enum_type_obj2' in data
+
+        # enum - not in list
+        rv = client.get('/admin/_enumtypefield/?flt0_4=first%2Csecond')
+        assert rv.status_code == 200
+        data = rv.data.decode('utf-8')
+        assert 'test1_val_1' in data
+        assert 'enum_type_obj1' not in data
+        assert 'enum_type_obj2' not in data
+
         # Test single custom filter on relation
         rv = client.get('/admin/_relation_test/?flt1_0=test1_val_1')
         data = rv.data.decode('utf-8')
@@ -1669,7 +1735,6 @@ def test_hybrid_property_nested(app, db, admin):
         assert 'Jim Smith' in data
 
 
-@pytest.mark.filterwarnings("ignore:Please update your type formatter:UserWarning")
 def test_url_args(app, db, admin):
     with app.app_context():
         Model1, Model2 = create_models(db)
@@ -2117,6 +2182,9 @@ def test_default_complex_sort(app, db, admin):
         assert data[1].model1.test1 == 'b'
 
 
+@pytest.mark.filterwarnings(
+    "ignore:'iter_groups' is expected to return 4 items tuple since wtforms 3.1, this will be mandatory in wtforms 3.2:DeprecationWarning",
+)
 def test_extra_fields(app, db, admin):
     with app.app_context():
         Model1, _ = create_models(db)
@@ -2182,6 +2250,9 @@ def test_extra_field_order(app, db, admin):
         ('zh_CN', '首页'),
         ('zh_TW', '首頁'),
     )
+)
+@pytest.mark.filterwarnings(
+    "ignore:'iter_groups' is expected to return 4 items tuple since wtforms 3.1, this will be mandatory in wtforms 3.2:DeprecationWarning",
 )
 @flask_babel_test_decorator
 def test_modelview_localization(request, app, locale, expect_text):
@@ -2409,7 +2480,7 @@ def test_safe_redirect(app, db, admin):
             expected = 'http://localhost' + expected
 
         assert rv.location.startswith(expected)
-        assert 'url=http%3A%2F%2Flocalhost%2Fadmin%2Fmodel2view%2F' in rv.location
+        assert 'url=http://localhost/admin/model2view/' in rv.location
         assert 'id=1' in rv.location
 
         rv = client.post('/admin/model1/new/?url=http://google.com/evil/',
@@ -2418,7 +2489,7 @@ def test_safe_redirect(app, db, admin):
 
         assert rv.status_code == 302
         assert rv.location.startswith(expected)
-        assert 'url=%2Fadmin%2Fmodel1%2F' in rv.location
+        assert 'url=/admin/model1/' in rv.location
         assert 'id=2' in rv.location
 
 
@@ -2437,6 +2508,79 @@ def test_simple_list_pager(app, db, admin):
 
         count, data = view.get_list(0, None, None, None, None)
         assert count is None
+
+
+def test_customising_page_size(app, db, admin):
+    with app.app_context():
+        M1, _ = create_models(db)
+
+        db.session.add_all(
+            [M1(str(f'instance-{x+1:03d}')) for x in range(101)]
+        )
+
+        view1 = CustomModelView(M1, db.session, endpoint='view1', page_size=20, can_set_page_size=False)
+        admin.add_view(view1)
+
+        view2 = CustomModelView(M1, db.session, endpoint='view2', page_size=5, can_set_page_size=False)
+        admin.add_view(view2)
+
+        view3 = CustomModelView(M1, db.session, endpoint='view3', page_size=20, can_set_page_size=True)
+        admin.add_view(view3)
+
+        view4 = CustomModelView(M1, db.session, endpoint='view4', page_size=5, page_size_options=(5, 10, 15), can_set_page_size=True)
+        admin.add_view(view4)
+
+        client = app.test_client()
+
+        rv = client.get('/admin/view1/')
+        assert 'instance-020' in rv.text
+        assert 'instance-021' not in rv.text
+
+        # `can_set_page_size=False`, so only the default of 20 is available.
+        rv = client.get('/admin/view1/?page_size=50')
+        assert 'instance-020' in rv.text
+        assert 'instance-021' not in rv.text
+
+        # Check view2, which has `page_size=5` to change the default page size
+        rv = client.get('/admin/view2/')
+        assert 'instance-005' in rv.text
+        assert 'instance-006' not in rv.text
+
+        # Check view3, which has `can_set_page_size=True`
+        rv = client.get('/admin/view3/')
+        assert 'instance-020' in rv.text
+        assert 'instance-021' not in rv.text
+
+        rv = client.get('/admin/view3/?page_size=50')
+        assert 'instance-050' in rv.text
+        assert 'instance-051' not in rv.text
+
+        rv = client.get('/admin/view3/?page_size=100')
+        assert 'instance-100' in rv.text
+        assert 'instance-101' not in rv.text
+
+        # Invalid page sizes are reset to the default
+        rv = client.get('/admin/view3/?page_size=1')
+        assert 'instance-020' in rv.text
+        assert 'instance-021' not in rv.text
+
+        # Check view4, which has custom `page_size_options`
+        rv = client.get('/admin/view4/')
+        assert 'instance-005' in rv.text
+        assert 'instance-006' not in rv.text
+
+        # Invalid page sizes are reset to the default
+        rv = client.get('/admin/view4/?page_size=1')
+        assert 'instance-005' in rv.text
+        assert 'instance-006' not in rv.text
+
+        rv = client.get('/admin/view4/?page_size=10')
+        assert 'instance-010' in rv.text
+        assert 'instance-011' not in rv.text
+
+        rv = client.get('/admin/view4/?page_size=15')
+        assert 'instance-015' in rv.text
+        assert 'instance-016' not in rv.text
 
 
 def test_unlimited_page_size(app, db, admin):
@@ -2563,12 +2707,11 @@ def test_multipath_joins(app, db, admin):
         assert rv.status_code == 200
 
 
-# TODO: Why this fails?
-@pytest.mark.xfail(raises=Exception)
-def test_different_bind_joins(app, db, admin):
-    app.config['SQLALCHEMY_BINDS'] = {
-        'other': 'sqlite:///'
-    }
+def test_different_bind_joins(request, app):
+    app.config['SQLALCHEMY_BINDS'] = {'other': 'sqlite:///'}
+
+    db = request.getfixturevalue('db')
+    admin = request.getfixturevalue('admin')
 
     with app.app_context():
         class Model1(db.Model):
@@ -2639,3 +2782,82 @@ def test_export_csv(app, db, admin):
         data = rv.data.decode('utf-8')
         assert rv.status_code == 200
         assert len(data.splitlines()) > 21
+
+
+STRING_CONSTANT = "Anyway, here's Wonderwall"
+
+
+def test_string_null_behavior(app, db, admin):
+    with app.app_context():
+        class StringTestModel(db.Model):
+            id = db.Column(db.Integer, primary_key=True)
+            test_no = db.Column(db.Integer, nullable=False)
+            string_field = db.Column(db.String)
+            string_field_nonull = db.Column(db.String, nullable=False)
+            string_field_nonull_default = db.Column(db.String, nullable=False, default='')
+            text_field = db.Column(db.Text)
+            text_field_nonull = db.Column(db.Text, nullable=False)
+            text_field_nonull_default = db.Column(db.Text, nullable=False, default='')
+
+        db.create_all()
+
+        view = CustomModelView(StringTestModel, db.session)
+        admin.add_view(view)
+
+        client = app.test_client()
+
+        valid_params = {
+            "test_no": 1,
+            "string_field_nonull": STRING_CONSTANT,
+            "text_field_nonull": STRING_CONSTANT,
+        }
+        rv = client.post('/admin/stringtestmodel/new/',
+                         data=valid_params)
+        assert rv.status_code == 302
+
+        # Assert on defaults
+        valid_inst = db.session.query(StringTestModel).filter(StringTestModel.test_no == 1).one()
+        assert valid_inst.string_field is None
+        assert valid_inst.string_field_nonull == STRING_CONSTANT
+        assert valid_inst.string_field_nonull_default == ''
+        assert valid_inst.text_field is None
+        assert valid_inst.text_field_nonull == STRING_CONSTANT
+        assert valid_inst.text_field_nonull_default == ''
+
+        # Assert that nulls are caught on the non-null fields
+        invalid_string_field = {
+            "test_no": 2,
+            "string_field_nonull": None,
+            "text_field_nonull": STRING_CONSTANT,
+        }
+        rv = client.post('/admin/stringtestmodel/new/',
+                         data=invalid_string_field)
+        assert rv.status_code == 200
+        assert b'This field is required.' in rv.data
+        assert db.session.query(StringTestModel).filter(StringTestModel.test_no == 2).all() == []
+
+        invalid_text_field = {
+            "test_no": 3,
+            "string_field_nonull": STRING_CONSTANT,
+            "text_field_nonull": None,
+        }
+        rv = client.post('/admin/stringtestmodel/new/',
+                         data=invalid_text_field)
+        assert rv.status_code == 200
+        assert b'This field is required.' in rv.data
+        assert db.session.query(StringTestModel).filter(StringTestModel.test_no == 3).all() == []
+
+        # Assert that empty strings are converted to None on nullable fields.
+        empty_strings = {
+            "test_no": 4,
+            "string_field": "",
+            "text_field": "",
+            "string_field_nonull": STRING_CONSTANT,
+            "text_field_nonull": STRING_CONSTANT,
+        }
+        rv = client.post('/admin/stringtestmodel/new/',
+                         data=empty_strings)
+        assert rv.status_code == 302
+        empty_string_inst = db.session.query(StringTestModel).filter(StringTestModel.test_no == 4).one()
+        assert empty_string_inst.string_field is None
+        assert empty_string_inst.text_field is None
